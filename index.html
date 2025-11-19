@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Tracker & Analysis Dashboard</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/prop-types@15.8.1/prop-types.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/recharts@2.1.9/umd/Recharts.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } = Recharts;
+
+        // Icons as simple SVG components
+        const TrendingUp = () => <svg className="inline w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>;
+        const TrendingDown = () => <svg className="inline w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>;
+        const AlertTriangle = () => <svg className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
+        const Settings = () => <svg className="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+
+        // Sample data - replace with real data later
+        const sampleHoldings = [
+          { symbol: 'AAPL', name: 'Apple Inc.', shares: 50, avgCost: 145.00, currentPrice: 178.50, sector: 'Technology' },
+          { symbol: 'MSFT', name: 'Microsoft Corp.', shares: 30, avgCost: 280.00, currentPrice: 378.00, sector: 'Technology' },
+          { symbol: 'JNJ', name: 'Johnson & Johnson', shares: 25, avgCost: 160.00, currentPrice: 155.00, sector: 'Healthcare' },
+          { symbol: 'JPM', name: 'JPMorgan Chase', shares: 40, avgCost: 130.00, currentPrice: 195.00, sector: 'Financial' },
+          { symbol: 'XOM', name: 'Exxon Mobil', shares: 35, avgCost: 85.00, currentPrice: 105.00, sector: 'Energy' },
+          { symbol: 'PG', name: 'Procter & Gamble', shares: 20, avgCost: 140.00, currentPrice: 158.00, sector: 'Consumer' },
+        ];
+
+        const historicalData = [
+          { date: 'Jan', value: 45000 },
+          { date: 'Feb', value: 47500 },
+          { date: 'Mar', value: 46000 },
+          { date: 'Apr', value: 49000 },
+          { date: 'May', value: 52000 },
+          { date: 'Jun', value: 51000 },
+          { date: 'Jul', value: 54500 },
+          { date: 'Aug', value: 53000 },
+          { date: 'Sep', value: 56000 },
+          { date: 'Oct', value: 58500 },
+          { date: 'Nov', value: 57000 },
+          { date: 'Dec', value: 60250 },
+        ];
+
+        function InvestmentDashboard() {
+          const [holdings, setHoldings] = useState(sampleHoldings);
+          const [showAddForm, setShowAddForm] = useState(false);
+          const [newHolding, setNewHolding] = useState({
+            symbol: '', name: '', shares: '', avgCost: '', currentPrice: '', sector: 'Technology'
+          });
+          const [alerts, setAlerts] = useState([
+            { id: 1, type: 'price', message: 'JNJ is down 3.1% from cost basis', severity: 'warning' },
+            { id: 2, type: 'sector', message: 'Technology allocation exceeds 40%', severity: 'info' },
+          ]);
+
+          // Calculate portfolio metrics
+          const portfolioMetrics = useMemo(() => {
+            const totalValue = holdings.reduce((sum, h) => sum + (h.shares * h.currentPrice), 0);
+            const totalCost = holdings.reduce((sum, h) => sum + (h.shares * h.avgCost), 0);
+            const totalGain = totalValue - totalCost;
+            const percentGain = ((totalGain / totalCost) * 100).toFixed(2);
+            
+            // Sector breakdown
+            const sectors = {};
+            holdings.forEach(h => {
+              const value = h.shares * h.currentPrice;
+              sectors[h.sector] = (sectors[h.sector] || 0) + value;
+            });
+            
+            const sectorData = Object.entries(sectors).map(([name, value]) => ({
+              name,
+              value: ((value / totalValue) * 100).toFixed(1)
+            }));
+
+            return { totalValue, totalCost, totalGain, percentGain, sectorData };
+          }, [holdings]);
+
+          const handleAddHolding = () => {
+            if (newHolding.symbol && newHolding.shares && newHolding.avgCost && newHolding.currentPrice) {
+              setHoldings([...holdings, {
+                ...newHolding,
+                shares: parseFloat(newHolding.shares),
+                avgCost: parseFloat(newHolding.avgCost),
+                currentPrice: parseFloat(newHolding.currentPrice)
+              }]);
+              setNewHolding({ symbol: '', name: '', shares: '', avgCost: '', currentPrice: '', sector: 'Technology' });
+              setShowAddForm(false);
+            }
+          };
+
+          const removeHolding = (symbol) => {
+            setHoldings(holdings.filter(h => h.symbol !== symbol));
+          };
+
+          return (
+            <div className="min-h-screen bg-gray-50 p-6">
+              <div className="max-w-7xl mx-auto">
+                {/* Header */}
+                <div className="mb-8">
+                  <h1 className="text-3xl font-bold text-gray-900">Investment Tracker</h1>
+                  <p className="text-gray-600">Portfolio analysis and performance dashboard</p>
+                </div>
+
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <p className="text-sm text-gray-500">Total Value</p>
+                    <p className="text-2xl font-bold">${portfolioMetrics.totalValue.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <p className="text-sm text-gray-500">Total Cost</p>
+                    <p className="text-2xl font-bold">${portfolioMetrics.totalCost.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <p className="text-sm text-gray-500">Total Gain/Loss</p>
+                    <p className={`text-2xl font-bold ${portfolioMetrics.totalGain >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {portfolioMetrics.totalGain >= 0 ? '+' : ''}${portfolioMetrics.totalGain.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <p className="text-sm text-gray-500">Return %</p>
+                    <p className={`text-2xl font-bold ${portfolioMetrics.percentGain >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {portfolioMetrics.percentGain >= 0 ? <TrendingUp /> : <TrendingDown />}
+                      {' '}{portfolioMetrics.percentGain}%
+                    </p>
+                  </div>
+                </div>
+
+                {/* Charts Row */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                  {/* Performance Chart */}
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h2 className="text-lg font-semibold mb-4">Portfolio Performance</h2>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <LineChart data={historicalData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => ['$' + value.toLocaleString(), 'Value']} />
+                        <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Sector Allocation */}
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h2 className="text-lg font-semibold mb-4">Sector Allocation</h2>
+                    <ResponsiveContainer width="100%" height={250}>
+                      <BarChart data={portfolioMetrics.sectorData} layout="vertical">
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis type="number" unit="%" />
+                        <YAxis dataKey="name" type="category" width={80} />
+                        <Tooltip formatter={(value) => [value + '%', 'Allocation']} />
+                        <Bar dataKey="value" fill="#3b82f6" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Alerts */}
+                {alerts.length > 0 && (
+                  <div className="bg-white rounded-lg shadow p-6 mb-8">
+                    <h2 className="text-lg font-semibold mb-4">Alerts & Notifications</h2>
+                    <div className="space-y-3">
+                      {alerts.map(alert => (
+                        <div key={alert.id} className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg">
+                          <AlertTriangle />
+                          <span className="text-sm text-gray-700">{alert.message}</span>
+                          <button 
+                            onClick={() => setAlerts(alerts.filter(a => a.id !== alert.id))}
+                            className="ml-auto text-gray-400 hover:text-gray-600"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Holdings Table */}
+                <div className="bg-white rounded-lg shadow">
+                  <div className="p-6 border-b flex justify-between items-center">
+                    <h2 className="text-lg font-semibold">Holdings</h2>
+                    <button 
+                      onClick={() => setShowAddForm(!showAddForm)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
+                    >
+                      + Add Position
+                    </button>
+                  </div>
+
+                  {/* Add Form */}
+                  {showAddForm && (
+                    <div className="p-6 bg-gray-50 border-b">
+                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                        <input
+                          placeholder="Symbol"
+                          value={newHolding.symbol}
+                          onChange={(e) => setNewHolding({...newHolding, symbol: e.target.value.toUpperCase()})}
+                          className="border rounded px-3 py-2 text-sm"
+                        />
+                        <input
+                          placeholder="Company Name"
+                          value={newHolding.name}
+                          onChange={(e) => setNewHolding({...newHolding, name: e.target.value})}
+                          className="border rounded px-3 py-2 text-sm"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Shares"
+                          value={newHolding.shares}
+                          onChange={(e) => setNewHolding({...newHolding, shares: e.target.value})}
+                          className="border rounded px-3 py-2 text-sm"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Avg Cost"
+                          value={newHolding.avgCost}
+                          onChange={(e) => setNewHolding({...newHolding, avgCost: e.target.value})}
+                          className="border rounded px-3 py-2 text-sm"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Current Price"
+                          value={newHolding.currentPrice}
+                          onChange={(e) => setNewHolding({...newHolding, currentPrice: e.target.value})}
+                          className="border rounded px-3 py-2 text-sm"
+                        />
+                        <select
+                          value={newHolding.sector}
+                          onChange={(e) => setNewHolding({...newHolding, sector: e.target.value})}
+                          className="border rounded px-3 py-2 text-sm"
+                        >
+                          <option>Technology</option>
+                          <option>Healthcare</option>
+                          <option>Financial</option>
+                          <option>Energy</option>
+                          <option>Consumer</option>
+                          <option>Industrial</option>
+                          <option>Utilities</option>
+                        </select>
+                      </div>
+                      <div className="mt-4 flex gap-2">
+                        <button 
+                          onClick={handleAddHolding}
+                          className="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700"
+                        >
+                          Save
+                        </button>
+                        <button 
+                          onClick={() => setShowAddForm(false)}
+                          className="bg-gray-300 text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-400"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Table */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="text-left p-4 text-sm font-medium text-gray-500">Symbol</th>
+                          <th className="text-left p-4 text-sm font-medium text-gray-500">Name</th>
+                          <th className="text-right p-4 text-sm font-medium text-gray-500">Shares</th>
+                          <th className="text-right p-4 text-sm font-medium text-gray-500">Avg Cost</th>
+                          <th className="text-right p-4 text-sm font-medium text-gray-500">Current</th>
+                          <th className="text-right p-4 text-sm font-medium text-gray-500">Value</th>
+                          <th className="text-right p-4 text-sm font-medium text-gray-500">Gain/Loss</th>
+                          <th className="text-center p-4 text-sm font-medium text-gray-500">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {holdings.map(holding => {
+                          const value = holding.shares * holding.currentPrice;
+                          const cost = holding.shares * holding.avgCost;
+                          const gain = value - cost;
+                          const gainPercent = ((gain / cost) * 100).toFixed(2);
+                          
+                          return (
+                            <tr key={holding.symbol} className="border-t hover:bg-gray-50">
+                              <td className="p-4 font-medium">{holding.symbol}</td>
+                              <td className="p-4 text-gray-600">{holding.name}</td>
+                              <td className="p-4 text-right">{holding.shares}</td>
+                              <td className="p-4 text-right">${holding.avgCost.toFixed(2)}</td>
+                              <td className="p-4 text-right">${holding.currentPrice.toFixed(2)}</td>
+                              <td className="p-4 text-right font-medium">${value.toLocaleString()}</td>
+                              <td className={`p-4 text-right ${gain >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {gain >= 0 ? '+' : ''}${gain.toLocaleString()} ({gainPercent}%)
+                              </td>
+                              <td className="p-4 text-center">
+                                <button 
+                                  onClick={() => removeHolding(holding.symbol)}
+                                  className="text-red-500 hover:text-red-700 text-sm"
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-8 text-center text-sm text-gray-500">
+                  <p>Investment Tracker Dashboard • Data is for demonstration purposes only</p>
+                  <p className="mt-1">
+                    It does not constitute financial advice. Always conduct your own research and consider 
+                    consulting with a qualified financial advisor before making investment decisions.
+                  </p>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        ReactDOM.render(<InvestmentDashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>
