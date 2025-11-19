@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Tracker & Analysis Dashboard</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/recharts@2.1.16/umd/Recharts.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState, useMemo } = React;
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } = Recharts;
+
+        // Icons as simple SVG components
+        const TrendingUp = () => <svg className="inline w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>;
+        const TrendingDown = () => <svg className="inline w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>;
+        const AlertTriangle = () => <svg className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
+        const Settings = () => <svg className="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+        const Download = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>;
+        const Mail = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>;
+        const Plus = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>;
+        const Trash2 = () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>;
+
+        // Sample stock data
+        const initialStocks = [
+          {
+            symbol: 'AAPL',
+            name: 'Apple Inc.',
+            currentPrice: 178.50,
+            previousClose: 182.30,
+            weekHigh52: 199.62,
+            weekLow52: 124.17,
+            peRatio: 28.5,
+            dividendYield: 0.55,
+            marketCap: '2.8T',
+            volume: 52436789,
+            avgVolume: 58000000,
+            eps: 6.26,
+            beta: 1.28,
+            priceHistory: [175, 177, 180, 182, 179, 181, 183, 182, 178.5],
+            rsi: 42,
+            ma50: 181.20,
+            ma200: 172.50,
+          },
+          {
+            symbol: 'MSFT',
+            name: 'Microsoft Corp.',
+            currentPrice: 378.90,
+            previousClose: 374.50,
+            weekHigh52: 384.30,
+            weekLow52: 245.61,
+            peRatio: 35.2,
+            dividendYield: 0.82,
+            marketCap: '2.8T',
+            volume: 22145632,
+            avgVolume: 25000000,
+            eps: 10.76,
+            beta: 0.93,
+            priceHistory: [368, 370, 372, 374, 376, 375, 377, 374.5, 378.9],
+            rsi: 58,
+            ma50: 370.80,
+            ma200: 355.20,
+          },
+          {
+            symbol: 'JNJ',
+            name: 'Johnson & Johnson',
+            currentPrice: 156.20,
+            previousClose: 158.90,
+            weekHigh52: 175.97,
+            weekLow52: 143.13,
+            peRatio: 15.8,
+            dividendYield: 3.02,
+            marketCap: '376B',
+            volume: 8234567,
+            avgVolume: 7500000,
+            eps: 9.88,
+            beta: 0.54,
+            priceHistory: [160, 159, 158, 157, 159, 160, 159, 158.9, 156.2],
+            rsi: 35,
+            ma50: 159.40,
+            ma200: 162.80,
+          },
+          {
+            symbol: 'KO',
+            name: 'Coca-Cola Co.',
+            currentPrice: 58.45,
+            previousClose: 59.80,
+            weekHigh52: 64.99,
+            weekLow52: 51.55,
+            peRatio: 23.1,
+            dividendYield: 3.18,
+            marketCap: '253B',
+            volume: 12567890,
+            avgVolume: 15000000,
+            eps: 2.53,
+            beta: 0.59,
+            priceHistory: [61, 60.5, 60, 59.8, 59.5, 59.8, 60, 59.8, 58.45],
+            rsi: 28,
+            ma50: 60.20,
+            ma200: 59.80,
+          },
+          {
+            symbol: 'NVDA',
+            name: 'NVIDIA Corp.',
+            currentPrice: 875.30,
+            previousClose: 850.20,
+            weekHigh52: 974.00,
+            weekLow52: 373.56,
+            peRatio: 68.5,
+            dividendYield: 0.02,
+            marketCap: '2.2T',
+            volume: 45678901,
+            avgVolume: 42000000,
+            eps: 12.78,
+            beta: 1.72,
+            priceHistory: [820, 835, 845, 850, 860, 855, 858, 850.2, 875.3],
+            rsi: 72,
+            ma50: 845.60,
+            ma200: 680.40,
+          },
+        ];
+
+        const defaultThresholds = {
+          priceDropPercent: 3,
+          rsiOversold: 30,
+          rsiOverbought: 70,
+          minDividendYield: 2.5,
+          maxPERatio: 25,
+          volumeSpike: 1.5,
+        };
+
+        function InvestmentDashboard() {
+          const [stocks, setStocks] = useState(initialStocks);
+          const [thresholds, setThresholds] = useState(defaultThresholds);
+          const [activeTab, setActiveTab] = useState('dashboard');
+          const [showSettings, setShowSettings] = useState(false);
+          const [newStock, setNewStock] = useState({ symbol: '', name: '' });
+
+          const calculateChange = (current, previous) => {
+            return ((current - previous) / previous * 100).toFixed(2);
+          };
+
+          const analyzedStocks = useMemo(() => {
+            return stocks.map(stock => {
+              const changePercent = parseFloat(calculateChange(stock.currentPrice, stock.previousClose));
+              const signals = [];
+              let score = 50;
+
+              if (changePercent <= -thresholds.priceDropPercent) {
+                signals.push({ type: 'opportunity', message: `Price dropped ${Math.abs(changePercent)}% - potential buy` });
+                score += 10;
+              }
+
+              if (stock.rsi <= thresholds.rsiOversold) {
+                signals.push({ type: 'opportunity', message: `RSI at ${stock.rsi} - oversold condition` });
+                score += 15;
+              } else if (stock.rsi >= thresholds.rsiOverbought) {
+                signals.push({ type: 'warning', message: `RSI at ${stock.rsi} - overbought condition` });
+                score -= 10;
+              }
+
+              if (stock.dividendYield >= thresholds.minDividendYield) {
+                signals.push({ type: 'opportunity', message: `Strong dividend yield: ${stock.dividendYield}%` });
+                score += 10;
+              }
+
+              if (stock.peRatio <= thresholds.maxPERatio) {
+                signals.push({ type: 'opportunity', message: `Attractive P/E ratio: ${stock.peRatio}` });
+                score += 10;
+              } else if (stock.peRatio > 40) {
+                signals.push({ type: 'warning', message: `High P/E ratio: ${stock.peRatio}` });
+                score -= 5;
+              }
+
+              const volumeRatio = stock.volume / stock.avgVolume;
+              if (volumeRatio >= thresholds.volumeSpike) {
+                signals.push({ type: 'alert', message: `Volume spike: ${(volumeRatio * 100).toFixed(0)}% of average` });
+              }
+
+              if (stock.currentPrice > stock.ma50 && stock.ma50 > stock.ma200) {
+                signals.push({ type: 'opportunity', message: 'Bullish: Price above 50 & 200 MA' });
+                score += 10;
+              } else if (stock.currentPrice < stock.ma50 && stock.ma50 < stock.ma200) {
+                signals.push({ type: 'warning', message: 'Bearish: Price below 50 & 200 MA' });
+                score -= 10;
+              }
+
+              const distanceFromHigh = ((stock.weekHigh52 - stock.currentPrice) / stock.weekHigh52 * 100).toFixed(1);
+              
+              if (parseFloat(distanceFromHigh) > 20) {
+                signals.push({ type: 'opportunity', message: `${distanceFromHigh}% below 52-week high` });
+                score += 5;
+              }
+
+              return {
+                ...stock,
+                changePercent,
+                signals,
+                score: Math.min(100, Math.max(0, score)),
+                recommendation: score >= 70 ? 'Strong Buy' : score >= 55 ? 'Buy' : score >= 45 ? 'Hold' : score >= 30 ? 'Watch' : 'Caution'
+              };
+            });
+          }, [stocks, thresholds]);
+
+          const opportunities = analyzedStocks.filter(stock => stock.score >= 55).sort((a, b) => b.score - a.score);
+
+          const generateReport = () => {
+            const date = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            
+            let report = `📊 DAILY INVESTMENT ANALYSIS REPORT\n`;
+            report += `Generated: ${date}\n`;
+            report += `${'='.repeat(50)}\n\n`;
+
+            report += `🎯 TOP OPPORTUNITIES\n`;
+            report += `${'-'.repeat(30)}\n`;
+            
+            opportunities.forEach((stock, index) => {
+              report += `\n${index + 1}. ${stock.symbol} - ${stock.name}\n`;
+              report += `   Price: $${stock.currentPrice} (${stock.changePercent >= 0 ? '+' : ''}${stock.changePercent}%)\n`;
+              report += `   Score: ${stock.score}/100 - ${stock.recommendation}\n`;
+              report += `   Dividend Yield: ${stock.dividendYield}%\n`;
+              report += `   P/E Ratio: ${stock.peRatio}\n`;
+              report += `   RSI: ${stock.rsi}\n`;
+              report += `   Signals:\n`;
+              stock.signals.forEach(signal => {
+                const icon = signal.type === 'opportunity' ? '✅' : signal.type === 'warning' ? '⚠️' : '📢';
+                report += `   ${icon} ${signal.message}\n`;
+              });
+            });
+
+            report += `\n\n📈 FULL WATCHLIST SUMMARY\n`;
+            report += `${'-'.repeat(30)}\n`;
+            
+            analyzedStocks.forEach(stock => {
+              const arrow = stock.changePercent >= 0 ? '↑' : '↓';
+              report += `${stock.symbol}: $${stock.currentPrice} ${arrow}${Math.abs(stock.changePercent)}% | Score: ${stock.score} | ${stock.recommendation}\n`;
+            });
+
+            report += `\n\n⚠️ DISCLAIMER\n`;
+            report += `This report is for informational purposes only and does not constitute financial advice.\n`;
+
+            return report;
+          };
+
+          const downloadReport = () => {
+            const report = generateReport();
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `investment-report-${new Date().toISOString().split('T')[0]}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+          };
+
+          const copyReportToClipboard = () => {
+            const report = generateReport();
+            navigator.clipboard.writeText(report);
+            alert('Report copied to clipboard! You can paste it into an email.');
+          };
+
+          const addStock = () => {
+            if (newStock.symbol && newStock.name) {
+              const stock = {
+                symbol: newStock.symbol.toUpperCase(),
+                name: newStock.name,
+                currentPrice: 100,
+                previousClose: 100,
+                weekHigh52: 120,
+                weekLow52: 80,
+                peRatio: 20,
+                dividendYield: 1.5,
+                marketCap: 'N/A',
+                volume: 1000000,
+                avgVolume: 1000000,
+                eps: 5,
+                beta: 1,
+                priceHistory: [98, 99, 100, 101, 100, 99, 100, 100, 100],
+                rsi: 50,
+                ma50: 100,
+                ma200: 98,
+              };
+              setStocks([...stocks, stock]);
+              setNewStock({ symbol: '', name: '' });
+            }
+          };
+
+          const removeStock = (symbol) => {
+            setStocks(stocks.filter(s => s.symbol !== symbol));
+          };
+
+          return (
+            <div className="min-h-screen bg-gray-900 text-white p-4">
+              {/* Header */}
+              <div className="mb-6">
+                <h1 className="text-3xl font-bold text-blue-400">📈 Investment Tracker & Analysis</h1>
+                <p className="text-gray-400 mt-1">Fundamentals • Technicals • Dividends • Momentum</p>
+                <p className="text-xs text-gray-500 mt-1">Share this file to collaborate • Open in any browser</p>
+              </div>
+
+              {/* Navigation */}
+              <div className="flex gap-2 mb-6 flex-wrap">
+                {['dashboard', 'opportunities', 'watchlist', 'report'].map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 py-2 rounded-lg capitalize ${
+                      activeTab === tab ? 'bg-blue-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setShowSettings(!showSettings)}
+                  className="px-4 py-2 rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 ml-auto"
+                >
+                  <Settings /> Thresholds
+                </button>
+              </div>
+
+              {/* Settings Panel */}
+              {showSettings && (
+                <div className="bg-gray-800 rounded-lg p-4 mb-6">
+                  <h3 className="text-lg font-semibold mb-4">⚙️ Alert Thresholds</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Price Drop Alert (%)</label>
+                      <input
+                        type="number"
+                        value={thresholds.priceDropPercent}
+                        onChange={e => setThresholds({...thresholds, priceDropPercent: parseFloat(e.target.value)})}
+                        className="w-full bg-gray-700 rounded px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">RSI Oversold (below)</label>
+                      <input
+                        type="number"
+                        value={thresholds.rsiOversold}
+                        onChange={e => setThresholds({...thresholds, rsiOversold: parseFloat(e.target.value)})}
+                        className="w-full bg-gray-700 rounded px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">RSI Overbought (above)</label>
+                      <input
+                        type="number"
+                        value={thresholds.rsiOverbought}
+                        onChange={e => setThresholds({...thresholds, rsiOverbought: parseFloat(e.target.value)})}
+                        className="w-full bg-gray-700 rounded px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Min Dividend Yield (%)</label>
+                      <input
+                        type="number"
+                        value={thresholds.minDividendYield}
+                        onChange={e => setThresholds({...thresholds, minDividendYield: parseFloat(e.target.value)})}
+                        className="w-full bg-gray-700 rounded px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Max P/E Ratio</label>
+                      <input
+                        type="number"
+                        value={thresholds.maxPERatio}
+                        onChange={e => setThresholds({...thresholds, maxPERatio: parseFloat(e.target.value)})}
+                        className="w-full bg-gray-700 rounded px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-400 mb-1">Volume Spike (x avg)</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={thresholds.volumeSpike}
+                        onChange={e => setThresholds({...thresholds, volumeSpike: parseFloat(e.target.value)})}
+                        className="w-full bg-gray-700 rounded px-3 py-2"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Dashboard Tab */}
+              {activeTab === 'dashboard' && (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-gray-800 rounded-lg p-4">
+                      <div className="text-gray-400 text-sm">Total Stocks</div>
+                      <div className="text-2xl font-bold">{stocks.length}</div>
+                    </div>
+                    <div className="bg-gray-800 rounded-lg p-4">
+                      <div className="text-gray-400 text-sm">Buy Opportunities</div>
+                      <div className="text-2xl font-bold text-green-400">{opportunities.length}</div>
+                    </div>
+                    <div className="bg-gray-800 rounded-lg p-4">
+                      <div className="text-gray-400 text-sm">Avg Dividend Yield</div>
+                      <div className="text-2xl font-bold text-blue-400">
+                        {(stocks.reduce((sum, s) => sum + s.dividendYield, 0) / stocks.length).toFixed(2)}%
+                      </div>
+                    </div>
+                    <div className="bg-gray-800 rounded-lg p-4">
+                      <div className="text-gray-400 text-sm">Oversold (RSI&lt;30)</div>
+                      <div className="text-2xl font-bold text-yellow-400">
+                        {analyzedStocks.filter(s => s.rsi < 30).length}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-gray-800 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold mb-4">🎯 Top Opportunities Today</h3>
+                    {opportunities.length === 0 ? (
+                      <p className="text-gray-400">No strong opportunities based on current thresholds.</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {opportunities.slice(0, 3).map(stock => (
+                          <div key={stock.symbol} className="bg-gray-700 rounded-lg p-3">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <div className="font-bold">{stock.symbol}</div>
+                                <div className="text-sm text-gray-400">{stock.name}</div>
+                              </div>
+                              <div className="text-right">
+                                <div className="font-bold">${stock.currentPrice}</div>
+                                <div className={`text-sm ${stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                  {stock.changePercent >= 0 ? '+' : ''}{stock.changePercent}%
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-2 flex items-center justify-between">
+                              <span className="text-sm bg-green-600 px-2 py-1 rounded">
+                                Score: {stock.score}/100
+                              </span>
+                              <span className="text-sm text-green-400">{stock.recommendation}</span>
+                            </div>
+                            <div className="mt-2 text-xs text-gray-400">
+                              {stock.signals.filter(s => s.type === 'opportunity').slice(0, 2).map((s, i) => (
+                                <div key={i}>✅ {s.message}</div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-gray-800 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold mb-4">📊 Watchlist Performance</h3>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analyzedStocks}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                          <XAxis dataKey="symbol" stroke="#9CA3AF" />
+                          <YAxis stroke="#9CA3AF" />
+                          <Tooltip 
+                            contentStyle={{ backgroundColor: '#1F2937', border: 'none' }}
+                            labelStyle={{ color: '#F3F4F6' }}
+                          />
+                          <Bar 
+                            dataKey="changePercent" 
+                            fill="#3B82F6"
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Opportunities Tab */}
+              {activeTab === 'opportunities' && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">🎯 All Investment Opportunities</h3>
+                  {analyzedStocks
+                    .sort((a, b) => b.score - a.score)
+                    .map(stock => (
+                      <div key={stock.symbol} className="bg-gray-800 rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <div className="text-xl font-bold">{stock.symbol}</div>
+                            <div className="text-sm text-gray-400">{stock.name}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xl font-bold">${stock.currentPrice}</div>
+                            <div className={`${stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {stock.changePercent >= 0 ? <TrendingUp /> : <TrendingDown />}
+                              {' '}{stock.changePercent >= 0 ? '+' : ''}{stock.changePercent}%
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3 text-sm">
+                          <div className="bg-gray-700 rounded p-2">
+                            <div className="text-gray-400">P/E Ratio</div>
+                            <div className="font-semibold">{stock.peRatio}</div>
+                          </div>
+                          <div className="bg-gray-700 rounded p-2">
+                            <div className="text-gray-400">Div Yield</div>
+                            <div className="font-semibold">{stock.dividendYield}%</div>
+                          </div>
+                          <div className="bg-gray-700 rounded p-2">
+                            <div className="text-gray-400">RSI</div>
+                            <div className={`font-semibold ${stock.rsi < 30 ? 'text-green-400' : stock.rsi > 70 ? 'text-red-400' : ''}`}>
+                              {stock.rsi}
+                            </div>
+                          </div>
+                          <div className="bg-gray-700 rounded p-2">
+                            <div className="text-gray-400">Score</div>
+                            <div className={`font-semibold ${stock.score >= 55 ? 'text-green-400' : stock.score < 45 ? 'text-red-400' : 'text-yellow-400'}`}>
+                              {stock.score}/100
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between mb-3">
+                          <span className={`px-3 py-1 rounded text-sm font-semibold ${
+                            stock.recommendation === 'Strong Buy' ? 'bg-green-600' :
+                            stock.recommendation === 'Buy' ? 'bg-green-500' :
+                            stock.recommendation === 'Hold' ? 'bg-yellow-600' :
+                            stock.recommendation === 'Watch' ? 'bg-orange-600' : 'bg-red-600'
+                          }`}>
+                            {stock.recommendation}
+                          </span>
+                          <div className="text-sm text-gray-400">
+                            52W: ${stock.weekLow52} - ${stock.weekHigh52}
+                          </div>
+                        </div>
+
+                        {stock.signals.length > 0 && (
+                          <div className="border-t border-gray-700 pt-3">
+                            <div className="text-sm font-semibold mb-2">Signals:</div>
+                            {stock.signals.map((signal, idx) => (
+                              <div key={idx} className={`text-sm mb-1 ${
+                                signal.type === 'opportunity' ? 'text-green-400' :
+                                signal.type === 'warning' ? 'text-yellow-400' : 'text-blue-400'
+                              }`}>
+                                {signal.type === 'opportunity' ? '✅' : signal.type === 'warning' ? '⚠️' : '📢'} {signal.message}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {/* Watchlist Tab */}
+              {activeTab === 'watchlist' && (
+                <div className="space-y-4">
+                  <div className="bg-gray-800 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold mb-4">➕ Add Stock to Watchlist</h3>
+                    <div className="flex gap-2 flex-wrap">
+                      <input
+                        type="text"
+                        placeholder="Symbol (e.g., TSLA)"
+                        value={newStock.symbol}
+                        onChange={e => setNewStock({...newStock, symbol: e.target.value})}
+                        className="flex-1 min-w-32 bg-gray-700 rounded px-3 py-2"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Company Name"
+                        value={newStock.name}
+                        onChange={e => setNewStock({...newStock, name: e.target.value})}
+                        className="flex-1 min-w-32 bg-gray-700 rounded px-3 py-2"
+                      />
+                      <button
+                        onClick={addStock}
+                        className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"
+                      >
+                        <Plus />
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-2">
+                      Note: New stocks are added with placeholder data. Connect to an API for real data.
+                    </p>
+                  </div>
+
+                  <div className="bg-gray-800 rounded-lg overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-700">
+                        <tr>
+                          <th className="text-left p-3">Symbol</th>
+                          <th className="text-left p-3">Price</th>
+                          <th className="text-left p-3">Change</th>
+                          <th className="text-left p-3">P/E</th>
+                          <th className="text-left p-3">Div %</th>
+                          <th className="text-left p-3">RSI</th>
+                          <th className="text-left p-3">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {stocks.map(stock => (
+                          <tr key={stock.symbol} className="border-t border-gray-700">
+                            <td className="p-3">
+                              <div className="font-semibold">{stock.symbol}</div>
+                              <div className="text-xs text-gray-400">{stock.name}</div>
+                            </td>
+                            <td className="p-3">${stock.currentPrice}</td>
+                            <td className={`p-3 ${parseFloat(calculateChange(stock.currentPrice, stock.previousClose)) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                              {calculateChange(stock.currentPrice, stock.previousClose)}%
+                            </td>
+                            <td className="p-3">{stock.peRatio}</td>
+                            <td className="p-3">{stock.dividendYield}%</td>
+                            <td className={`p-3 ${stock.rsi < 30 ? 'text-green-400' : stock.rsi > 70 ? 'text-red-400' : ''}`}>
+                              {stock.rsi}
+                            </td>
+                            <td className="p-3">
+                              <button
+                                onClick={() => removeStock(stock.symbol)}
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                <Trash2 />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Report Tab */}
+              {activeTab === 'report' && (
+                <div className="space-y-4">
+                  <div className="bg-gray-800 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold mb-4">📧 Daily Report</h3>
+                    <div className="flex gap-2 mb-4 flex-wrap">
+                      <button
+                        onClick={downloadReport}
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded"
+                      >
+                        <Download /> Download Report
+                      </button>
+                      <button
+                        onClick={copyReportToClipboard}
+                        className="flex items-center gap-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded"
+                      >
+                        <Mail /> Copy for Email
+                      </button>
+                    </div>
+                    <pre className="bg-gray-900 p-4 rounded text-sm overflow-auto max-h-96 whitespace-pre-wrap">
+                      {generateReport()}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Disclaimer */}
+              <div className="mt-6 p-4 bg-yellow-900/30 rounded-lg border border-yellow-700">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle />
+                  <div className="text-sm text-yellow-200">
+                    <strong>Disclaimer:</strong> This tool is for educational and informational purposes only. 
+                    It does not constitute financial advice. Always conduct your own research and consider consulting 
+                    with a qualified financial advisor before making investment decisions.
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        ReactDOM.render(<InvestmentDashboard />, document.getElementById('root'));
+    </script>
+</body>
+</html>
