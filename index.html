@@ -18,24 +18,44 @@
     <div id="root"></div>
     
     <script type="text/babel">
-        const { useState, useMemo } = React;
-        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } = Recharts;
+        const { useState, useMemo, useEffect } = React;
+        const { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell } = Recharts;
 
         // Icons as simple SVG components
         const TrendingUp = () => <svg className="inline w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>;
         const TrendingDown = () => <svg className="inline w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>;
         const AlertTriangle = () => <svg className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
-        const Settings = () => <svg className="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+        const CheckCircle = () => <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+        const InfoIcon = () => <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
 
-        // Sample data - replace with real data later
-        const sampleHoldings = [
-          { symbol: 'AAPL', name: 'Apple Inc.', shares: 50, avgCost: 145.00, currentPrice: 178.50, sector: 'Technology' },
-          { symbol: 'MSFT', name: 'Microsoft Corp.', shares: 30, avgCost: 280.00, currentPrice: 378.00, sector: 'Technology' },
-          { symbol: 'JNJ', name: 'Johnson & Johnson', shares: 25, avgCost: 160.00, currentPrice: 155.00, sector: 'Healthcare' },
-          { symbol: 'JPM', name: 'JPMorgan Chase', shares: 40, avgCost: 130.00, currentPrice: 195.00, sector: 'Financial' },
-          { symbol: 'XOM', name: 'Exxon Mobil', shares: 35, avgCost: 85.00, currentPrice: 105.00, sector: 'Energy' },
-          { symbol: 'PG', name: 'Procter & Gamble', shares: 20, avgCost: 140.00, currentPrice: 158.00, sector: 'Consumer' },
+        const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+
+        // Default data
+        const defaultHoldings = [
+          { symbol: 'AAPL', name: 'Apple Inc.', shares: 50, avgCost: 145.00, currentPrice: 178.50, sector: 'Technology', weekChange: 3.2 },
+          { symbol: 'MSFT', name: 'Microsoft Corp.', shares: 30, avgCost: 280.00, currentPrice: 378.00, sector: 'Technology', weekChange: 2.8 },
+          { symbol: 'JNJ', name: 'Johnson & Johnson', shares: 25, avgCost: 160.00, currentPrice: 155.00, sector: 'Healthcare', weekChange: -1.5 },
+          { symbol: 'JPM', name: 'JPMorgan Chase', shares: 40, avgCost: 130.00, currentPrice: 195.00, sector: 'Financial', weekChange: 4.1 },
+          { symbol: 'XOM', name: 'Exxon Mobil', shares: 35, avgCost: 85.00, currentPrice: 105.00, sector: 'Energy', weekChange: 1.2 },
+          { symbol: 'PG', name: 'Procter & Gamble', shares: 20, avgCost: 140.00, currentPrice: 158.00, sector: 'Consumer', weekChange: 0.8 },
         ];
+
+        const defaultSettings = {
+          dailyBudget: 500,
+          weeklyBudget: 2000,
+          monthlyBudget: 5000,
+          maxSectorAllocation: 40,
+          stopLossThreshold: -10,
+          takeProfitThreshold: 25,
+          minDiversification: 5
+        };
+
+        const defaultSpending = {
+          today: 0,
+          thisWeek: 0,
+          thisMonth: 0,
+          lastResetDate: new Date().toDateString()
+        };
 
         const historicalData = [
           { date: 'Jan', value: 45000 },
@@ -52,23 +72,134 @@
           { date: 'Dec', value: 60250 },
         ];
 
+        // Helper functions for localStorage
+        const loadFromStorage = (key, defaultValue) => {
+          try {
+            const saved = localStorage.getItem(key);
+            return saved ? JSON.parse(saved) : defaultValue;
+          } catch (e) {
+            console.error(`Error loading ${key} from localStorage:`, e);
+            return defaultValue;
+          }
+        };
+
+        const saveToStorage = (key, value) => {
+          try {
+            localStorage.setItem(key, JSON.stringify(value));
+          } catch (e) {
+            console.error(`Error saving ${key} to localStorage:`, e);
+          }
+        };
+
         function InvestmentDashboard() {
-          const [holdings, setHoldings] = useState(sampleHoldings);
-          const [showAddForm, setShowAddForm] = useState(false);
-          const [newHolding, setNewHolding] = useState({
-            symbol: '', name: '', shares: '', avgCost: '', currentPrice: '', sector: 'Technology'
+          // Load initial state from localStorage
+          const [holdings, setHoldings] = useState(() => loadFromStorage('investmentTracker_holdings', defaultHoldings));
+          const [settings, setSettings] = useState(() => loadFromStorage('investmentTracker_settings', defaultSettings));
+          const [spending, setSpending] = useState(() => {
+            const saved = loadFromStorage('investmentTracker_spending', defaultSpending);
+            // Check if we need to reset daily/weekly/monthly spending
+            const today = new Date();
+            const lastReset = new Date(saved.lastResetDate || today);
+            
+            let updatedSpending = { ...saved };
+            
+            // Reset daily if it's a new day
+            if (today.toDateString() !== lastReset.toDateString()) {
+              updatedSpending.today = 0;
+            }
+            
+            // Reset weekly if it's a new week (Monday)
+            const getWeekNumber = (d) => {
+              const firstDayOfYear = new Date(d.getFullYear(), 0, 1);
+              const pastDaysOfYear = (d - firstDayOfYear) / 86400000;
+              return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+            };
+            if (getWeekNumber(today) !== getWeekNumber(lastReset) || today.getFullYear() !== lastReset.getFullYear()) {
+              updatedSpending.thisWeek = 0;
+            }
+            
+            // Reset monthly if it's a new month
+            if (today.getMonth() !== lastReset.getMonth() || today.getFullYear() !== lastReset.getFullYear()) {
+              updatedSpending.thisMonth = 0;
+            }
+            
+            updatedSpending.lastResetDate = today.toDateString();
+            return updatedSpending;
           });
-          const [alerts, setAlerts] = useState([
-            { id: 1, type: 'price', message: 'JNJ is down 3.1% from cost basis', severity: 'warning' },
-            { id: 2, type: 'sector', message: 'Technology allocation exceeds 40%', severity: 'info' },
-          ]);
+
+          const [showAddForm, setShowAddForm] = useState(false);
+          const [showSettings, setShowSettings] = useState(false);
+          const [activeTab, setActiveTab] = useState('overview');
+          const [newHolding, setNewHolding] = useState({
+            symbol: '', name: '', shares: '', avgCost: '', currentPrice: '', sector: 'Technology', weekChange: 0
+          });
+          const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+          // Save to localStorage whenever data changes
+          useEffect(() => {
+            saveToStorage('investmentTracker_holdings', holdings);
+          }, [holdings]);
+
+          useEffect(() => {
+            saveToStorage('investmentTracker_settings', settings);
+          }, [settings]);
+
+          useEffect(() => {
+            saveToStorage('investmentTracker_spending', spending);
+          }, [spending]);
+
+          // Reset all data function
+          const resetAllData = () => {
+            setHoldings(defaultHoldings);
+            setSettings(defaultSettings);
+            setSpending({ ...defaultSpending, lastResetDate: new Date().toDateString() });
+            setShowResetConfirm(false);
+            setShowSettings(false);
+          };
+
+          // Export data function
+          const exportData = () => {
+            const data = {
+              holdings,
+              settings,
+              spending,
+              exportDate: new Date().toISOString()
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `investment-tracker-backup-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          };
+
+          // Import data function
+          const importData = (event) => {
+            const file = event.target.files[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = (e) => {
+                try {
+                  const data = JSON.parse(e.target.result);
+                  if (data.holdings) setHoldings(data.holdings);
+                  if (data.settings) setSettings(data.settings);
+                  if (data.spending) setSpending(data.spending);
+                  alert('Data imported successfully!');
+                } catch (err) {
+                  alert('Error importing data. Please check the file format.');
+                }
+              };
+              reader.readAsText(file);
+            }
+          };
 
           // Calculate portfolio metrics
           const portfolioMetrics = useMemo(() => {
             const totalValue = holdings.reduce((sum, h) => sum + (h.shares * h.currentPrice), 0);
             const totalCost = holdings.reduce((sum, h) => sum + (h.shares * h.avgCost), 0);
             const totalGain = totalValue - totalCost;
-            const percentGain = ((totalGain / totalCost) * 100).toFixed(2);
+            const percentGain = totalCost > 0 ? ((totalGain / totalCost) * 100).toFixed(2) : 0;
             
             // Sector breakdown
             const sectors = {};
@@ -79,21 +210,290 @@
             
             const sectorData = Object.entries(sectors).map(([name, value]) => ({
               name,
-              value: ((value / totalValue) * 100).toFixed(1)
+              value: totalValue > 0 ? parseFloat(((value / totalValue) * 100).toFixed(1)) : 0,
+              amount: value
             }));
 
-            return { totalValue, totalCost, totalGain, percentGain, sectorData };
+            // Performance rankings
+            const holdingsWithMetrics = holdings.map(h => {
+              const value = h.shares * h.currentPrice;
+              const cost = h.shares * h.avgCost;
+              const gain = value - cost;
+              const gainPercent = cost > 0 ? ((gain / cost) * 100) : 0;
+              return { ...h, value, cost, gain, gainPercent };
+            });
+
+            const topPerformers = [...holdingsWithMetrics].sort((a, b) => b.gainPercent - a.gainPercent);
+            const bottomPerformers = [...holdingsWithMetrics].sort((a, b) => a.gainPercent - b.gainPercent);
+            const weeklyMomentum = [...holdingsWithMetrics].sort((a, b) => b.weekChange - a.weekChange);
+
+            return { 
+              totalValue, 
+              totalCost, 
+              totalGain, 
+              percentGain, 
+              sectorData, 
+              topPerformers, 
+              bottomPerformers,
+              weeklyMomentum,
+              holdingsWithMetrics
+            };
           }, [holdings]);
+
+          // Generate smart alerts
+          const smartAlerts = useMemo(() => {
+            const alerts = [];
+            
+            // Budget alerts
+            if (spending.today >= settings.dailyBudget * 0.8) {
+              alerts.push({
+                id: 'budget-daily',
+                type: 'budget',
+                severity: spending.today >= settings.dailyBudget ? 'error' : 'warning',
+                icon: spending.today >= settings.dailyBudget ? 'error' : 'warning',
+                message: spending.today >= settings.dailyBudget 
+                  ? `Daily budget exceeded: $${spending.today.toLocaleString()} / $${settings.dailyBudget.toLocaleString()}`
+                  : `Approaching daily limit: $${spending.today.toLocaleString()} / $${settings.dailyBudget.toLocaleString()} (${((spending.today/settings.dailyBudget)*100).toFixed(0)}%)`
+              });
+            }
+            
+            if (spending.thisWeek >= settings.weeklyBudget * 0.8) {
+              alerts.push({
+                id: 'budget-weekly',
+                type: 'budget',
+                severity: spending.thisWeek >= settings.weeklyBudget ? 'error' : 'warning',
+                icon: 'warning',
+                message: `Weekly spending at $${spending.thisWeek.toLocaleString()} / $${settings.weeklyBudget.toLocaleString()} (${((spending.thisWeek/settings.weeklyBudget)*100).toFixed(0)}%)`
+              });
+            }
+
+            if (spending.thisMonth >= settings.monthlyBudget * 0.8) {
+              alerts.push({
+                id: 'budget-monthly',
+                type: 'budget',
+                severity: spending.thisMonth >= settings.monthlyBudget ? 'error' : 'warning',
+                icon: 'warning',
+                message: `Monthly spending at $${spending.thisMonth.toLocaleString()} / $${settings.monthlyBudget.toLocaleString()} (${((spending.thisMonth/settings.monthlyBudget)*100).toFixed(0)}%)`
+              });
+            }
+
+            // Sector concentration alerts
+            portfolioMetrics.sectorData.forEach(sector => {
+              if (sector.value > settings.maxSectorAllocation) {
+                alerts.push({
+                  id: `sector-${sector.name}`,
+                  type: 'diversification',
+                  severity: 'warning',
+                  icon: 'warning',
+                  message: `${sector.name} allocation (${sector.value}%) exceeds ${settings.maxSectorAllocation}% threshold`
+                });
+              }
+            });
+
+            // Stop loss alerts
+            portfolioMetrics.holdingsWithMetrics.forEach(h => {
+              if (h.gainPercent <= settings.stopLossThreshold) {
+                alerts.push({
+                  id: `stoploss-${h.symbol}`,
+                  type: 'stoploss',
+                  severity: 'error',
+                  icon: 'error',
+                  message: `⚠️ ${h.symbol} hit stop-loss threshold: ${h.gainPercent.toFixed(1)}% (limit: ${settings.stopLossThreshold}%)`
+                });
+              }
+            });
+
+            // Take profit alerts
+            portfolioMetrics.holdingsWithMetrics.forEach(h => {
+              if (h.gainPercent >= settings.takeProfitThreshold) {
+                alerts.push({
+                  id: `takeprofit-${h.symbol}`,
+                  type: 'takeprofit',
+                  severity: 'success',
+                  icon: 'success',
+                  message: `🎯 ${h.symbol} reached take-profit target: +${h.gainPercent.toFixed(1)}% (target: ${settings.takeProfitThreshold}%)`
+                });
+              }
+            });
+
+            // Top performer alerts
+            if (portfolioMetrics.topPerformers.length > 0) {
+              const top = portfolioMetrics.topPerformers[0];
+              alerts.push({
+                id: 'top-performer',
+                type: 'insight',
+                severity: 'info',
+                icon: 'info',
+                message: `🏆 Top performer: ${top.symbol} at +${top.gainPercent.toFixed(1)}% ($${top.gain.toLocaleString()} gain)`
+              });
+            }
+
+            // Weekly momentum leader
+            if (portfolioMetrics.weeklyMomentum.length > 0 && portfolioMetrics.weeklyMomentum[0].weekChange > 0) {
+              const leader = portfolioMetrics.weeklyMomentum[0];
+              alerts.push({
+                id: 'momentum-leader',
+                type: 'insight',
+                severity: 'info',
+                icon: 'info',
+                message: `📈 Weekly momentum leader: ${leader.symbol} up ${leader.weekChange}% this week`
+              });
+            }
+
+            // Diversification warning
+            if (holdings.length < settings.minDiversification) {
+              alerts.push({
+                id: 'diversification',
+                type: 'diversification',
+                severity: 'warning',
+                icon: 'warning',
+                message: `Portfolio has ${holdings.length} positions. Consider adding ${settings.minDiversification - holdings.length} more for better diversification.`
+              });
+            }
+
+            return alerts;
+          }, [holdings, settings, spending, portfolioMetrics]);
+
+          // Data-driven insights
+          const insights = useMemo(() => {
+            const insightsList = [];
+            
+            // Portfolio health score
+            let healthScore = 100;
+            if (holdings.length < 5) healthScore -= 20;
+            if (portfolioMetrics.sectorData.some(s => s.value > 40)) healthScore -= 15;
+            if (portfolioMetrics.bottomPerformers.some(h => h.gainPercent < -10)) healthScore -= 10;
+            
+            insightsList.push({
+              title: 'Portfolio Health Score',
+              value: Math.max(0, healthScore),
+              description: healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : healthScore >= 40 ? 'Fair' : 'Needs Attention',
+              color: healthScore >= 80 ? 'text-green-600' : healthScore >= 60 ? 'text-blue-600' : healthScore >= 40 ? 'text-yellow-600' : 'text-red-600'
+            });
+
+            // Risk assessment
+            const volatilePositions = portfolioMetrics.holdingsWithMetrics.filter(h => Math.abs(h.weekChange) > 3).length;
+            const riskLevel = volatilePositions > 2 ? 'High' : volatilePositions > 0 ? 'Moderate' : 'Low';
+            
+            insightsList.push({
+              title: 'Current Risk Level',
+              value: riskLevel,
+              description: `${volatilePositions} volatile position(s) this week`,
+              color: riskLevel === 'High' ? 'text-red-600' : riskLevel === 'Moderate' ? 'text-yellow-600' : 'text-green-600'
+            });
+
+            // Best sector
+            const sortedSectors = [...portfolioMetrics.sectorData].sort((a, b) => b.value - a.value);
+            if (sortedSectors.length > 0) {
+              insightsList.push({
+                title: 'Largest Sector Exposure',
+                value: sortedSectors[0].name,
+                description: `${sortedSectors[0].value}% of portfolio`,
+                color: sortedSectors[0].value > 40 ? 'text-yellow-600' : 'text-blue-600'
+              });
+            }
+
+            // Average gain
+            const avgGain = holdings.length > 0 
+              ? portfolioMetrics.holdingsWithMetrics.reduce((sum, h) => sum + h.gainPercent, 0) / holdings.length 
+              : 0;
+            insightsList.push({
+              title: 'Average Position Return',
+              value: `${avgGain >= 0 ? '+' : ''}${avgGain.toFixed(1)}%`,
+              description: avgGain >= 10 ? 'Strong performance' : avgGain >= 0 ? 'Positive trend' : 'Review underperformers',
+              color: avgGain >= 10 ? 'text-green-600' : avgGain >= 0 ? 'text-blue-600' : 'text-red-600'
+            });
+
+            return insightsList;
+          }, [holdings, portfolioMetrics]);
+
+          // Recommendations
+          const recommendations = useMemo(() => {
+            const recs = [];
+            
+            // Rebalancing suggestions
+            portfolioMetrics.sectorData.forEach(sector => {
+              if (sector.value > settings.maxSectorAllocation) {
+                const excessPercent = sector.value - settings.maxSectorAllocation;
+                const excessAmount = (excessPercent / 100) * portfolioMetrics.totalValue;
+                recs.push({
+                  type: 'rebalance',
+                  priority: 'high',
+                  action: `Consider reducing ${sector.name} exposure`,
+                  detail: `Currently ${sector.value}% ($${sector.amount.toLocaleString()}). Reduce by ~$${excessAmount.toFixed(0)} to reach ${settings.maxSectorAllocation}% target.`
+                });
+              }
+            });
+
+            // Take profit suggestions
+            portfolioMetrics.holdingsWithMetrics
+              .filter(h => h.gainPercent >= settings.takeProfitThreshold)
+              .forEach(h => {
+                recs.push({
+                  type: 'take-profit',
+                  priority: 'medium',
+                  action: `Consider taking profits on ${h.symbol}`,
+                  detail: `Up ${h.gainPercent.toFixed(1)}% with $${h.gain.toLocaleString()} unrealized gain. Hit your ${settings.takeProfitThreshold}% target.`
+                });
+              });
+
+            // Stop loss suggestions
+            portfolioMetrics.holdingsWithMetrics
+              .filter(h => h.gainPercent <= settings.stopLossThreshold)
+              .forEach(h => {
+                recs.push({
+                  type: 'stop-loss',
+                  priority: 'high',
+                  action: `Review position in ${h.symbol}`,
+                  detail: `Down ${Math.abs(h.gainPercent).toFixed(1)}% ($${Math.abs(h.gain).toLocaleString()} loss). Consider cutting losses or averaging down.`
+                });
+              });
+
+            // Momentum opportunities
+            const strongMomentum = portfolioMetrics.weeklyMomentum.filter(h => h.weekChange > 2);
+            if (strongMomentum.length > 0) {
+              recs.push({
+                type: 'momentum',
+                priority: 'low',
+                action: `Strong weekly momentum detected`,
+                detail: `${strongMomentum.map(h => h.symbol).join(', ')} showing positive momentum. Consider adding to winners.`
+              });
+            }
+
+            // Diversification
+            if (holdings.length < settings.minDiversification) {
+              const missingSectors = ['Technology', 'Healthcare', 'Financial', 'Energy', 'Consumer', 'Industrial']
+                .filter(s => !portfolioMetrics.sectorData.find(sd => sd.name === s));
+              recs.push({
+                type: 'diversify',
+                priority: 'medium',
+                action: 'Add positions for better diversification',
+                detail: missingSectors.length > 0 
+                  ? `Consider adding exposure to: ${missingSectors.slice(0, 3).join(', ')}`
+                  : `Add ${settings.minDiversification - holdings.length} more positions to reach minimum diversification.`
+              });
+            }
+
+            return recs;
+          }, [holdings, settings, portfolioMetrics]);
 
           const handleAddHolding = () => {
             if (newHolding.symbol && newHolding.shares && newHolding.avgCost && newHolding.currentPrice) {
+              const cost = parseFloat(newHolding.shares) * parseFloat(newHolding.avgCost);
               setHoldings([...holdings, {
                 ...newHolding,
                 shares: parseFloat(newHolding.shares),
                 avgCost: parseFloat(newHolding.avgCost),
-                currentPrice: parseFloat(newHolding.currentPrice)
+                currentPrice: parseFloat(newHolding.currentPrice),
+                weekChange: parseFloat(newHolding.weekChange) || 0
               }]);
-              setNewHolding({ symbol: '', name: '', shares: '', avgCost: '', currentPrice: '', sector: 'Technology' });
+              setSpending({
+                ...spending,
+                today: spending.today + cost,
+                thisWeek: spending.thisWeek + cost,
+                thisMonth: spending.thisMonth + cost
+              });
+              setNewHolding({ symbol: '', name: '', shares: '', avgCost: '', currentPrice: '', sector: 'Technology', weekChange: 0 });
               setShowAddForm(false);
             }
           };
@@ -106,13 +506,173 @@
             <div className="min-h-screen bg-gray-50 p-6">
               <div className="max-w-7xl mx-auto">
                 {/* Header */}
-                <div className="mb-8">
-                  <h1 className="text-3xl font-bold text-gray-900">Investment Tracker</h1>
-                  <p className="text-gray-600">Portfolio analysis and performance dashboard</p>
+                <div className="mb-6 flex justify-between items-start">
+                  <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Investment Tracker</h1>
+                    <p className="text-gray-600">Data-driven portfolio analysis and insights</p>
+                    <p className="text-xs text-green-600 mt-1">✓ Data auto-saves to your browser</p>
+                  </div>
+                  <button 
+                    onClick={() => setShowSettings(!showSettings)}
+                    className="bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg text-sm flex items-center"
+                  >
+                    ⚙️ Settings & Thresholds
+                  </button>
                 </div>
 
+                {/* Settings Panel */}
+                {showSettings && (
+                  <div className="bg-white rounded-lg shadow p-6 mb-6">
+                    <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-lg font-semibold">Budget & Threshold Settings</h2>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={exportData}
+                          className="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1 rounded text-sm"
+                        >
+                          📥 Export
+                        </button>
+                        <label className="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-1 rounded text-sm cursor-pointer">
+                          📤 Import
+                          <input type="file" accept=".json" onChange={importData} className="hidden" />
+                        </label>
+                        <button 
+                          onClick={() => setShowResetConfirm(true)}
+                          className="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-1 rounded text-sm"
+                        >
+                          🔄 Reset
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Reset Confirmation */}
+                    {showResetConfirm && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                        <p className="text-sm text-red-800 mb-3">Are you sure you want to reset all data? This cannot be undone.</p>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={resetAllData}
+                            className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+                          >
+                            Yes, Reset All
+                          </button>
+                          <button 
+                            onClick={() => setShowResetConfirm(false)}
+                            className="bg-gray-300 text-gray-700 px-3 py-1 rounded text-sm hover:bg-gray-400"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Daily Budget ($)</label>
+                        <input
+                          type="number"
+                          value={settings.dailyBudget}
+                          onChange={(e) => setSettings({...settings, dailyBudget: parseFloat(e.target.value) || 0})}
+                          className="w-full border rounded px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Weekly Budget ($)</label>
+                        <input
+                          type="number"
+                          value={settings.weeklyBudget}
+                          onChange={(e) => setSettings({...settings, weeklyBudget: parseFloat(e.target.value) || 0})}
+                          className="w-full border rounded px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Monthly Budget ($)</label>
+                        <input
+                          type="number"
+                          value={settings.monthlyBudget}
+                          onChange={(e) => setSettings({...settings, monthlyBudget: parseFloat(e.target.value) || 0})}
+                          className="w-full border rounded px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Max Sector Allocation (%)</label>
+                        <input
+                          type="number"
+                          value={settings.maxSectorAllocation}
+                          onChange={(e) => setSettings({...settings, maxSectorAllocation: parseFloat(e.target.value) || 0})}
+                          className="w-full border rounded px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Stop Loss Threshold (%)</label>
+                        <input
+                          type="number"
+                          value={settings.stopLossThreshold}
+                          onChange={(e) => setSettings({...settings, stopLossThreshold: parseFloat(e.target.value) || 0})}
+                          className="w-full border rounded px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Take Profit Target (%)</label>
+                        <input
+                          type="number"
+                          value={settings.takeProfitThreshold}
+                          onChange={(e) => setSettings({...settings, takeProfitThreshold: parseFloat(e.target.value) || 0})}
+                          className="w-full border rounded px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-1">Min Positions (Diversification)</label>
+                        <input
+                          type="number"
+                          value={settings.minDiversification}
+                          onChange={(e) => setSettings({...settings, minDiversification: parseInt(e.target.value) || 0})}
+                          className="w-full border rounded px-3 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Current Spending */}
+                    <div className="mt-6 pt-4 border-t">
+                      <h3 className="text-sm font-medium text-gray-700 mb-3">Current Spending Period</h3>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="bg-gray-50 rounded p-3">
+                          <p className="text-xs text-gray-500">Today</p>
+                          <p className="text-lg font-semibold">${spending.today.toLocaleString()} <span className="text-sm font-normal text-gray-400">/ ${settings.dailyBudget.toLocaleString()}</span></p>
+                          <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                            <div 
+                              className={`h-2 rounded-full ${spending.today >= settings.dailyBudget ? 'bg-red-500' : spending.today >= settings.dailyBudget * 0.8 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                              style={{width: `${Math.min(100, (spending.today/settings.dailyBudget)*100)}%`}}
+                            ></div>
+                          </div>
+                        </div>
+                        <div className="bg-gray-50 rounded p-3">
+                          <p className="text-xs text-gray-500">This Week</p>
+                          <p className="text-lg font-semibold">${spending.thisWeek.toLocaleString()} <span className="text-sm font-normal text-gray-400">/ ${settings.weeklyBudget.toLocaleString()}</span></p>
+                          <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                            <div 
+                              className={`h-2 rounded-full ${spending.thisWeek >= settings.weeklyBudget ? 'bg-red-500' : spending.thisWeek >= settings.weeklyBudget * 0.8 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                              style={{width: `${Math.min(100, (spending.thisWeek/settings.weeklyBudget)*100)}%`}}
+                            ></div>
+                          </div>
+                        </div>
+                        <div className="bg-gray-50 rounded p-3">
+                          <p className="text-xs text-gray-500">This Month</p>
+                          <p className="text-lg font-semibold">${spending.thisMonth.toLocaleString()} <span className="text-sm font-normal text-gray-400">/ ${settings.monthlyBudget.toLocaleString()}</span></p>
+                          <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                            <div 
+                              className={`h-2 rounded-full ${spending.thisMonth >= settings.monthlyBudget ? 'bg-red-500' : spending.thisMonth >= settings.monthlyBudget * 0.8 ? 'bg-yellow-500' : 'bg-green-500'}`}
+                              style={{width: `${Math.min(100, (spending.thisMonth/settings.monthlyBudget)*100)}%`}}
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                   <div className="bg-white rounded-lg shadow p-6">
                     <p className="text-sm text-gray-500">Total Value</p>
                     <p className="text-2xl font-bold">${portfolioMetrics.totalValue.toLocaleString()}</p>
@@ -136,57 +696,183 @@
                   </div>
                 </div>
 
-                {/* Charts Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                  {/* Performance Chart */}
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold mb-4">Portfolio Performance</h2>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <LineChart data={historicalData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="date" />
-                        <YAxis />
-                        <Tooltip formatter={(value) => ['$' + value.toLocaleString(), 'Value']} />
-                        <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-
-                  {/* Sector Allocation */}
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold mb-4">Sector Allocation</h2>
-                    <ResponsiveContainer width="100%" height={250}>
-                      <BarChart data={portfolioMetrics.sectorData} layout="vertical">
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis type="number" unit="%" />
-                        <YAxis dataKey="name" type="category" width={80} />
-                        <Tooltip formatter={(value) => [value + '%', 'Allocation']} />
-                        <Bar dataKey="value" fill="#3b82f6" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-
-                {/* Alerts */}
-                {alerts.length > 0 && (
-                  <div className="bg-white rounded-lg shadow p-6 mb-8">
-                    <h2 className="text-lg font-semibold mb-4">Alerts & Notifications</h2>
-                    <div className="space-y-3">
-                      {alerts.map(alert => (
-                        <div key={alert.id} className="flex items-start gap-3 p-3 bg-yellow-50 rounded-lg">
-                          <AlertTriangle />
+                {/* Smart Alerts */}
+                {smartAlerts.length > 0 && (
+                  <div className="bg-white rounded-lg shadow p-6 mb-6">
+                    <h2 className="text-lg font-semibold mb-4">Smart Alerts & Notifications</h2>
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {smartAlerts.map(alert => (
+                        <div 
+                          key={alert.id} 
+                          className={`flex items-start gap-3 p-3 rounded-lg ${
+                            alert.severity === 'error' ? 'bg-red-50' : 
+                            alert.severity === 'success' ? 'bg-green-50' : 
+                            alert.severity === 'info' ? 'bg-blue-50' : 'bg-yellow-50'
+                          }`}
+                        >
+                          {alert.icon === 'success' ? <CheckCircle /> : 
+                           alert.icon === 'info' ? <InfoIcon /> : <AlertTriangle />}
                           <span className="text-sm text-gray-700">{alert.message}</span>
-                          <button 
-                            onClick={() => setAlerts(alerts.filter(a => a.id !== alert.id))}
-                            className="ml-auto text-gray-400 hover:text-gray-600"
-                          >
-                            ×
-                          </button>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
+
+                {/* Tabs */}
+                <div className="bg-white rounded-lg shadow mb-6">
+                  <div className="border-b">
+                    <div className="flex">
+                      {['overview', 'insights', 'recommendations'].map(tab => (
+                        <button
+                          key={tab}
+                          onClick={() => setActiveTab(tab)}
+                          className={`px-6 py-3 text-sm font-medium ${
+                            activeTab === tab 
+                              ? 'border-b-2 border-blue-500 text-blue-600' 
+                              : 'text-gray-500 hover:text-gray-700'
+                          }`}
+                        >
+                          {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    {activeTab === 'overview' && (
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Performance Chart */}
+                        <div>
+                          <h3 className="text-md font-semibold mb-4">Portfolio Performance</h3>
+                          <ResponsiveContainer width="100%" height={250}>
+                            <LineChart data={historicalData}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="date" />
+                              <YAxis />
+                              <Tooltip formatter={(value) => ['$' + value.toLocaleString(), 'Value']} />
+                              <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+
+                        {/* Sector Allocation */}
+                        <div>
+                          <h3 className="text-md font-semibold mb-4">Sector Allocation</h3>
+                          <ResponsiveContainer width="100%" height={250}>
+                            <BarChart data={portfolioMetrics.sectorData} layout="vertical">
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis type="number" unit="%" />
+                              <YAxis dataKey="name" type="category" width={80} />
+                              <Tooltip formatter={(value) => [value + '%', 'Allocation']} />
+                              <Bar dataKey="value" fill="#3b82f6">
+                                {portfolioMetrics.sectorData.map((entry, index) => (
+                                  <Cell 
+                                    key={`cell-${index}`} 
+                                    fill={entry.value > settings.maxSectorAllocation ? '#ef4444' : COLORS[index % COLORS.length]} 
+                                  />
+                                ))}
+                              </Bar>
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeTab === 'insights' && (
+                      <div>
+                        {/* Insights Cards */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                          {insights.map((insight, idx) => (
+                            <div key={idx} className="bg-gray-50 rounded-lg p-4">
+                              <p className="text-xs text-gray-500 mb-1">{insight.title}</p>
+                              <p className={`text-xl font-bold ${insight.color}`}>{insight.value}</p>
+                              <p className="text-xs text-gray-500 mt-1">{insight.description}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Performance Rankings */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div>
+                            <h4 className="text-sm font-semibold mb-3 text-green-600">🏆 Top Performers</h4>
+                            <div className="space-y-2">
+                              {portfolioMetrics.topPerformers.slice(0, 3).map((h, idx) => (
+                                <div key={h.symbol} className="flex justify-between items-center bg-green-50 rounded p-2">
+                                  <span className="text-sm font-medium">{idx + 1}. {h.symbol}</span>
+                                  <span className="text-sm text-green-600">+{h.gainPercent.toFixed(1)}%</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-semibold mb-3 text-red-600">📉 Underperformers</h4>
+                            <div className="space-y-2">
+                              {portfolioMetrics.bottomPerformers.slice(0, 3).map((h, idx) => (
+                                <div key={h.symbol} className="flex justify-between items-center bg-red-50 rounded p-2">
+                                  <span className="text-sm font-medium">{idx + 1}. {h.symbol}</span>
+                                  <span className={`text-sm ${h.gainPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {h.gainPercent >= 0 ? '+' : ''}{h.gainPercent.toFixed(1)}%
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-semibold mb-3 text-blue-600">📈 Weekly Momentum</h4>
+                            <div className="space-y-2">
+                              {portfolioMetrics.weeklyMomentum.slice(0, 3).map((h, idx) => (
+                                <div key={h.symbol} className="flex justify-between items-center bg-blue-50 rounded p-2">
+                                  <span className="text-sm font-medium">{idx + 1}. {h.symbol}</span>
+                                  <span className={`text-sm ${h.weekChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {h.weekChange >= 0 ? '+' : ''}{h.weekChange}%
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeTab === 'recommendations' && (
+                      <div>
+                        {recommendations.length === 0 ? (
+                          <div className="text-center py-8 text-gray-500">
+                            <CheckCircle />
+                            <p className="mt-2">Your portfolio looks well-balanced. No immediate actions recommended.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {recommendations.map((rec, idx) => (
+                              <div 
+                                key={idx} 
+                                className={`border-l-4 p-4 rounded-r-lg ${
+                                  rec.priority === 'high' ? 'border-red-500 bg-red-50' :
+                                  rec.priority === 'medium' ? 'border-yellow-500 bg-yellow-50' :
+                                  'border-blue-500 bg-blue-50'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+                                    rec.priority === 'high' ? 'bg-red-200 text-red-800' :
+                                    rec.priority === 'medium' ? 'bg-yellow-200 text-yellow-800' :
+                                    'bg-blue-200 text-blue-800'
+                                  }`}>
+                                    {rec.priority.toUpperCase()}
+                                  </span>
+                                  <span className="text-xs text-gray-500">{rec.type}</span>
+                                </div>
+                                <p className="font-medium text-sm">{rec.action}</p>
+                                <p className="text-sm text-gray-600 mt-1">{rec.detail}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 {/* Holdings Table */}
                 <div className="bg-white rounded-lg shadow">
@@ -203,7 +889,7 @@
                   {/* Add Form */}
                   {showAddForm && (
                     <div className="p-6 bg-gray-50 border-b">
-                      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                      <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
                         <input
                           placeholder="Symbol"
                           value={newHolding.symbol}
@@ -235,6 +921,13 @@
                           placeholder="Current Price"
                           value={newHolding.currentPrice}
                           onChange={(e) => setNewHolding({...newHolding, currentPrice: e.target.value})}
+                          className="border rounded px-3 py-2 text-sm"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Week %"
+                          value={newHolding.weekChange}
+                          onChange={(e) => setNewHolding({...newHolding, weekChange: e.target.value})}
                           className="border rounded px-3 py-2 text-sm"
                         />
                         <select
@@ -280,6 +973,7 @@
                           <th className="text-right p-4 text-sm font-medium text-gray-500">Current</th>
                           <th className="text-right p-4 text-sm font-medium text-gray-500">Value</th>
                           <th className="text-right p-4 text-sm font-medium text-gray-500">Gain/Loss</th>
+                          <th className="text-right p-4 text-sm font-medium text-gray-500">Week</th>
                           <th className="text-center p-4 text-sm font-medium text-gray-500">Actions</th>
                         </tr>
                       </thead>
@@ -300,6 +994,9 @@
                               <td className="p-4 text-right font-medium">${value.toLocaleString()}</td>
                               <td className={`p-4 text-right ${gain >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                 {gain >= 0 ? '+' : ''}${gain.toLocaleString()} ({gainPercent}%)
+                              </td>
+                              <td className={`p-4 text-right ${holding.weekChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {holding.weekChange >= 0 ? '+' : ''}{holding.weekChange}%
                               </td>
                               <td className="p-4 text-center">
                                 <button 
