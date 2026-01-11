@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Tracker & Analysis Dashboard</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Using Chart.js instead of Recharts - more reliable -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="root"></div>
+    <script src="data.js"></script>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        function InvestmentTracker() {
+          const [stockData, setStockData] = useState({});
+          const [portfolio, setPortfolio] = useState([
+            { symbol: 'NVDA', shares: 10, purchasePrice: 120.50 },
+            { symbol: 'HOG', shares: 50, purchasePrice: 32.00 },
+            { symbol: 'SHOP', shares: 20, purchasePrice: 85.00 },
+          ]);
+          const [selectedStock, setSelectedStock] = useState('NVDA');
+          const [loading, setLoading] = useState(true);
+          const [availableSymbols, setAvailableSymbols] = useState([]);
+          const [newPosition, setNewPosition] = useState({ symbol: '', shares: '', purchasePrice: '' });
+          const [showAddForm, setShowAddForm] = useState(false);
+          const [dailyBudget, setDailyBudget] = useState(1000);
+          const [gainAlertPercent, setGainAlertPercent] = useState(10);
+          const [lossAlertPercent, setLossAlertPercent] = useState(-5);
+          const [showSettings, setShowSettings] = useState(false);
+          const [notifications, setNotifications] = useState([]);
+
+          useEffect(() => {
+            try {
+              setLoading(true);
+              const dataBySymbol = {};
+              
+              MARKET_DATA.forEach(item => {
+                if (!dataBySymbol[item.symbol]) {
+                  dataBySymbol[item.symbol] = [];
+                }
+                dataBySymbol[item.symbol].push({
+                  date: new Date(item.time).toLocaleDateString(),
+                  timestamp: new Date(item.time).getTime(),
+                  open: item.open,
+                  high: item.high,
+                  low: item.low,
+                  close: item.close,
+                  volume: item.volume,
+                  vwap: item.vwap
+                });
+              });
+              
+              Object.keys(dataBySymbol).forEach(symbol => {
+                dataBySymbol[symbol].sort((a, b) => a.timestamp - b.timestamp);
+              });
+              
+              setStockData(dataBySymbol);
+              setAvailableSymbols(Object.keys(dataBySymbol).sort());
+              setLoading(false);
+            } catch (error) {
+              console.error('Error loading data:', error);
+              setLoading(false);
+            }
+          }, []);
+
+          const portfolioMetrics = useMemo(() => {
+            if (!stockData || Object.keys(stockData).length === 0) return null;
+
+            let totalValue = 0, totalCost = 0, totalGainLoss = 0;
+
+            const positions = portfolio.map(pos => {
+              const symbolData = stockData[pos.symbol];
+              if (!symbolData || symbolData.length === 0) {
+                return { ...pos, currentPrice: 0, value: 0, gainLoss: 0, gainLossPercent: 0 };
+              }
+
+              const latestPrice = symbolData[symbolData.length - 1].close;
+              const value = pos.shares * latestPrice;
+              const cost = pos.shares * pos.purchasePrice;
+              const gainLoss = value - cost;
+              const gainLossPercent = ((latestPrice - pos.purchasePrice) / pos.purchasePrice) * 100;
+
+              totalValue += value;
+              totalCost += cost;
+              totalGainLoss += gainLoss;
+
+              return {
+                ...pos,
+                currentPrice: latestPrice,
+                value,
+                cost,
+                gainLoss,
+                gainLossPercent
+              };
+            });
+
+            const totalGainLossPercent = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0;
+
+            return {
+              positions,
+              totalValue,
+              totalCost,
+              totalGainLoss,
+              totalGainLossPercent
+            };
+          }, [portfolio, stockData]);
+
+          useEffect(() => {
+            if (!portfolioMetrics) return;
+
+            const newAlerts = [];
+            portfolioMetrics.positions.forEach(pos => {
+              if (pos.gainLossPercent >= gainAlertPercent) {
+                newAlerts.push({
+                  id: Date.now() + Math.random(),
+                  type: 'gain',
+                  symbol: pos.symbol,
+                  percent: pos.gainLossPercent,
+                  message: `${pos.symbol} is up ${pos.gainLossPercent.toFixed(2)}%! 📈`
+                });
+              }
+              if (pos.gainLossPercent <= lossAlertPercent) {
+                newAlerts.push({
+                  id: Date.now() + Math.random(),
+                  type: 'loss',
+                  symbol: pos.symbol,
+                  percent: pos.gainLossPercent,
+                  message: `${pos.symbol} is down ${Math.abs(pos.gainLossPercent).toFixed(2)}%! 📉`
+                });
+              }
+            });
+
+            if (newAlerts.length > 0) {
+              setNotifications(prev => [...newAlerts, ...prev].slice(0, 10));
+            }
+          }, [portfolioMetrics, gainAlertPercent, lossAlertPercent]);
+
+          const chartData = useMemo(() => {
+            if (!stockData[selectedStock]) return [];
+            return stockData[selectedStock];
+          }, [selectedStock, stockData]);
+
+          const stockPerformance = useMemo(() => {
+            if (!chartData || chartData.length === 0) return null;
+            const firstPrice = chartData[0].close;
+            const lastPrice = chartData[chartData.length - 1].close;
+            const change = lastPrice - firstPrice;
+            const changePercent = (change / firstPrice) * 100;
+            return { firstPrice, lastPrice, change, changePercent };
+          }, [chartData]);
+
+          const addPosition = () => {
+            if (!newPosition.symbol || !newPosition.shares || !newPosition.purchasePrice) return;
+            
+            const cost = parseFloat(newPosition.shares) * parseFloat(newPosition.purchasePrice);
+            if (cost > dailyBudget) {
+              alert(`This purchase ($${cost.toFixed(2)}) exceeds your daily budget ($${dailyBudget.toFixed(2)})`);
+              return;
+            }
+
+            setPortfolio([...portfolio, {
+              symbol: newPosition.symbol.toUpperCase(),
+              shares: parseFloat(newPosition.shares),
+              purchasePrice: parseFloat(newPosition.purchasePrice)
+            }]);
+            
+            setNewPosition({ symbol: '', shares: '', purchasePrice: '' });
+            setShowAddForm(false);
+
+            setNotifications(prev => [{
+              id: Date.now(),
+              type: 'info',
+              message: `Added ${newPosition.shares} shares of ${newPosition.symbol.toUpperCase()}`
+            }, ...prev].slice(0, 10));
+          };
+
+          const removePosition = (index) => {
+            const pos = portfolio[index];
+            setPortfolio(portfolio.filter((_, i) => i !== index));
+            setNotifications(prev => [{
+              id: Date.now(),
+              type: 'info',
+              message: `Removed ${pos.symbol} from portfolio`
+            }, ...prev].slice(0, 10));
+          };
+
+          const dismissNotification = (id) => {
+            setNotifications(prev => prev.filter(n => n.id !== id));
+          };
+
+          if (loading) {
+            return (
+              <div className="loading-screen">
+                <div className="spinner"></div>
+                <div>Loading market data...</div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="app">
+              <div className="notifications">
+                {notifications.map(notif => (
+                  <div key={notif.id} className={`notification notification-${notif.type}`}>
+                    <span>{notif.message}</span>
+                    <button onClick={() => dismissNotification(notif.id)}>×</button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="container">
+                <div className="header-card">
+                  <div>
+                    <h1>Investment Portfolio Tracker</h1>
+                    <p>Real-time tracking with alerts & budgets • {availableSymbols.length} symbols</p>
+                  </div>
+                  <button className="btn btn-primary" onClick={() => setShowSettings(!showSettings)}>
+                    ⚙️ Settings
+                  </button>
+                </div>
+
+                {showSettings && (
+                  <div className="settings-panel">
+                    <h2>Alert & Budget Settings</h2>
+                    <div className="settings-grid">
+                      <div className="setting-item">
+                        <label>Daily Budget Limit</label>
+                        <input
+                          type="number"
+                          value={dailyBudget}
+                          onChange={(e) => setDailyBudget(parseFloat(e.target.value))}
+                          className="input"
+                        />
+                        <small>Maximum amount to spend per day</small>
+                      </div>
+                      <div className="setting-item">
+                        <label>Gain Alert Threshold</label>
+                        <input
+                          type="number"
+                          value={gainAlertPercent}
+                          onChange={(e) => setGainAlertPercent(parseFloat(e.target.value))}
+                          className="input"
+                        />
+                        <small>Alert when stock gains exceed this %</small>
+                      </div>
+                      <div className="setting-item">
+                        <label>Loss Alert Threshold</label>
+                        <input
+                          type="number"
+                          value={lossAlertPercent}
+                          onChange={(e) => setLossAlertPercent(parseFloat(e.target.value))}
+                          className="input"
+                        />
+                        <small>Alert when stock losses exceed this %</small>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {portfolioMetrics && (
+                  <div className="metrics-grid">
+                    <div className="metric-card blue">
+                      <div className="metric-label">Total Value</div>
+                      <div className="metric-value">${portfolioMetrics.totalValue.toFixed(2)}</div>
+                      <div className="metric-footer">Portfolio worth</div>
+                    </div>
+                    <div className="metric-card purple">
+                      <div className="metric-label">Total Cost</div>
+                      <div className="metric-value">${portfolioMetrics.totalCost.toFixed(2)}</div>
+                      <div className="metric-footer">Amount invested</div>
+                    </div>
+                    <div className={`metric-card ${portfolioMetrics.totalGainLoss >= 0 ? 'green' : 'red'}`}>
+                      <div className="metric-label">Total Gain/Loss</div>
+                      <div className="metric-value">
+                        {portfolioMetrics.totalGainLoss >= 0 ? '+' : ''}${portfolioMetrics.totalGainLoss.toFixed(2)}
+                      </div>
+                      <div className="metric-footer">Net profit/loss</div>
+                    </div>
+                    <div className={`metric-card ${portfolioMetrics.totalGainLossPercent >= 0 ? 'green' : 'red'}`}>
+                      <div className="metric-label">Return %</div>
+                      <div className="metric-value">
+                        {portfolioMetrics.totalGainLossPercent >= 0 ? '+' : ''}{portfolioMetrics.totalGainLossPercent.toFixed(2)}%
+                      </div>
+                      <div className="metric-footer">Total return</div>
+                    </div>
+                    <div className="metric-card orange">
+                      <div className="metric-label">Daily Budget</div>
+                      <div className="metric-value">${dailyBudget.toFixed(2)}</div>
+                      <div className="metric-footer">Spending limit</div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="card">
+                  <div className="card-header">
+                    <h2>Your Positions</h2>
+                    <button className="btn btn-primary" onClick={() => setShowAddForm(!showAddForm)}>
+                      + Add Position
+                    </button>
+                  </div>
+
+                  {showAddForm && (
+                    <div className="add-form">
+                      <select
+                        value={newPosition.symbol}
+                        onChange={(e) => setNewPosition({...newPosition, symbol: e.target.value})}
+                        className="input"
+                      >
+                        <option value="">Select Symbol</option>
+                        {availableSymbols.map(sym => (
+                          <option key={sym} value={sym}>{sym}</option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        placeholder="Shares"
+                        value={newPosition.shares}
+                        onChange={(e) => setNewPosition({...newPosition, shares: e.target.value})}
+                        className="input"
+                      />
+                      <input
+                        type="number"
+                        step="0.01"
+                        placeholder="Purchase Price"
+                        value={newPosition.purchasePrice}
+                        onChange={(e) => setNewPosition({...newPosition, purchasePrice: e.target.value})}
+                        className="input"
+                      />
+                      <button onClick={addPosition} className="btn btn-success">
+                        Add
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="table-container">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Symbol</th>
+                          <th className="text-right">Shares</th>
+                          <th className="text-right">Purchase Price</th>
+                          <th className="text-right">Current Price</th>
+                          <th className="text-right">Value</th>
+                          <th className="text-right">Gain/Loss</th>
+                          <th className="text-right">Return %</th>
+                          <th className="text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {portfolioMetrics?.positions.map((pos, idx) => (
+                          <tr key={idx}>
+                            <td>
+                              <button
+                                onClick={() => setSelectedStock(pos.symbol)}
+                                className="symbol-btn"
+                              >
+                                {pos.symbol}
+                              </button>
+                            </td>
+                            <td className="text-right">{pos.shares}</td>
+                            <td className="text-right">${pos.purchasePrice.toFixed(2)}</td>
+                            <td className="text-right">${pos.currentPrice.toFixed(2)}</td>
+                            <td className="text-right">${pos.value.toFixed(2)}</td>
+                            <td className={`text-right ${pos.gainLoss >= 0 ? 'text-green' : 'text-red'}`}>
+                              {pos.gainLoss >= 0 ? '+' : ''}${pos.gainLoss.toFixed(2)}
+                            </td>
+                            <td className={`text-right ${pos.gainLossPercent >= 0 ? 'text-green' : 'text-red'}`}>
+                              {pos.gainLossPercent >= 0 ? '+' : ''}{pos.gainLossPercent.toFixed(2)}%
+                            </td>
+                            <td className="text-right">
+                              <button onClick={() => removePosition(idx)} className="btn-delete">
+                                🗑️
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="card">
+                  <div className="card-header">
+                    <h2>{selectedStock} Price Data</h2>
+                    <select
+                      value={selectedStock}
+                      onChange={(e) => setSelectedStock(e.target.value)}
+                      className="input"
+                    >
+                      {availableSymbols.map(symbol => (
+                        <option key={symbol} value={symbol}>{symbol}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {stockPerformance && (
+                    <div className="chart-stats">
+                      <span>First: ${stockPerformance.firstPrice.toFixed(2)}</span>
+                      <span>Latest: ${stockPerformance.lastPrice.toFixed(2)}</span>
+                      <span className={stockPerformance.change >= 0 ? 'text-green' : 'text-red'}>
+                        {stockPerformance.change >= 0 ? '+' : ''}${stockPerformance.change.toFixed(2)} 
+                        ({stockPerformance.changePercent >= 0 ? '+' : ''}{stockPerformance.changePercent.toFixed(2)}%)
+                      </span>
+                    </div>
+                  )}
+                  <div className="data-table-container">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Date</th>
+                          <th className="text-right">Open</th>
+                          <th className="text-right">High</th>
+                          <th className="text-right">Low</th>
+                          <th className="text-right">Close</th>
+                          <th className="text-right">Volume</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {chartData.slice(-10).reverse().map((day, idx) => (
+                          <tr key={idx}>
+                            <td>{day.date}</td>
+                            <td className="text-right">${day.open.toFixed(2)}</td>
+                            <td className="text-right text-green">${day.high.toFixed(2)}</td>
+                            <td className="text-right text-red">${day.low.toFixed(2)}</td>
+                            <td className="text-right">${day.close.toFixed(2)}</td>
+                            <td className="text-right">{day.volume.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="footer">
+                  <p>Data provided by Alpaca Markets • {availableSymbols.length} symbols tracked • Last updated: {new Date().toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        ReactDOM.render(<InvestmentTracker />, document.getElementById('root'));
+    </script>
+</body>
+</html>
